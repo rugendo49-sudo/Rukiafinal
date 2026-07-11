@@ -9,6 +9,7 @@ process.on("unhandledRejection", (err) => console.error("Unhandled rejection:", 
 
 import authRoutes from "./routes/auth.js";
 import walletRoutes from "./routes/wallet.js";
+import nestlinkRoutes from "./routes/nestlink.js";
 import adminRoutes from "./routes/admin.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
 import referralsRoutes from "./routes/referrals.js";
@@ -44,6 +45,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/nestlink", nestlinkRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/referrals", referralsRoutes);

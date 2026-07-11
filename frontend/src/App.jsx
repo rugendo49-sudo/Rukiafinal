@@ -291,6 +291,7 @@ export default function App() {
         balance={balance}
         logout={logout}
         getFreshIdToken={getFreshIdToken}
+        refreshBalance={refreshBalance}
       />
       <div className="provably-fair-footer" style={{ marginTop: 18, padding: '12px 18px', fontSize: 13, color: '#9aa8b8' }}>
         <strong>🔒 Provably Fair:</strong> Each crash point is cryptographically random using server seed + round ID. Results are <em>unpredictable</em> until revealed.

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../config/api.js";
+import NestlinkDeposit from "../components/NestlinkDeposit.jsx";
 
 const quickAmounts = [100, 200, 500, 1000];
 
-export default function ProfilePanel({ open, onClose, appUser, balance, logout, getFreshIdToken }) {
-  const [depositAmount, setDepositAmount] = useState(100);
+export default function ProfilePanel({ open, onClose, appUser, balance, logout, getFreshIdToken, refreshBalance }) {
   const [withdrawAmount, setWithdrawAmount] = useState(100);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -117,38 +117,24 @@ export default function ProfilePanel({ open, onClose, appUser, balance, logout, 
 
         <div className="about-card">
           <div className="section-heading">Deposit</div>
-          <div className="stepper-row">
-            <button className="stepper-btn" onClick={() => changePreset(Math.max(0, depositAmount - 100), setDepositAmount)}>-</button>
-            <input
-              type="number"
-              min="0"
-              value={depositAmount}
-              onChange={(e) => updateAmount(e.target.value, setDepositAmount)}
-            />
-            <button className="stepper-btn" onClick={() => changePreset(depositAmount + 100, setDepositAmount)}>+</button>
-          </div>
-          <div className="quick-presets about-presets">
-            {quickAmounts.map((amount) => (
-              <button key={amount} onClick={() => setDepositAmount(amount)}>
-                +{amount} KES
-              </button>
-            ))}
-          </div>
-          <button
-            className="primary-action deposit-btn"
-            onClick={async () => {
-              // Simulate deposit flow then track conversion server-side
-              showMockToast("Deposit coming soon");
+          <NestlinkDeposit
+            token={getFreshIdToken}
+            presets={[100, 150, 200]}
+            onSuccess={async () => {
+              showMockToast("STK push sent. Confirm on your phone.");
               try {
                 const token = await getFreshIdToken();
-                await fetch(`${API_URL}/api/referrals/track`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ eventType: 'deposit', amount: depositAmount * 100 }) });
+                await fetch(`${API_URL}/api/referrals/track`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ eventType: "deposit" }),
+                });
+                await refreshBalance?.();
               } catch (e) {
                 // ignore
               }
             }}
-          >
-            Deposit with M-Pesa
-          </button>
+          />
         </div>
 
         <div className="about-card">
