@@ -64,7 +64,7 @@ export default function App() {
     return await getFreshIdToken();
   }, [demoMode, getFreshIdToken]);
 
-  const { phase, multiplier, seedHash, lastCrash, history, config, slots, waitMs, waitStartedAt, allBets, connected, countdownSeconds, watchdogStatus, placeBet, cashOut, chatMessages, onlineUsers, sendChat } =
+  const { phase, multiplier, seedHash, lastCrash, history, config, slots, waitMs, waitStartedAt, curvePoints, allBets, connected, countdownSeconds, watchdogStatus, placeBet, cashOut, chatMessages, onlineUsers, sendChat } =
     useGameSocket(getToken, userId, demoMode, demoBalance, setDemoBalance, refreshBalance);
 
   const balance = displayUser ? displayUser.balance : 0;
@@ -245,7 +245,7 @@ export default function App() {
       
 
       {tab === "play" && (
-        <>
+        <div className="play-tab-content">
           <History history={history} />
           <div className="play-layout">
             <AllBetsPanel allBets={allBets} />
@@ -257,6 +257,7 @@ export default function App() {
                 seedHash={seedHash}
                 waitMs={waitMs}
                 waitStartedAt={waitStartedAt}
+                curvePoints={curvePoints}
               />
               <BetPanel
                 phase={phase}
@@ -278,7 +279,7 @@ export default function App() {
             </div>
             <ChatPanel chatMessages={chatMessages} onlineUsers={onlineUsers} sendChat={sendChat} isAdmin={!!appUser?.isAdmin} />
           </div>
-        </>
+        </div>
       )}
 
       {tab === "admin" && appUser?.isAdmin && <AdminDashboard getToken={getFreshIdToken} />}

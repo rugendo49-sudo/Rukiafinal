@@ -1,7 +1,17 @@
 import jwt from "jsonwebtoken";
 
 // Set to your Firebase project ID (visible in firebaseConfig.projectId on the client).
-const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "omoka-73f48";
+const PROJECT_ID =
+  process.env.FIREBASE_PROJECT_ID ||
+  process.env.VITE_FIREBASE_PROJECT_ID ||
+  process.env.GOOGLE_CLOUD_PROJECT ||
+  "omoka-73f48";
+
+const FIREBASE_API_KEY =
+  process.env.FIREBASE_API_KEY ||
+  process.env.VITE_FIREBASE_API_KEY ||
+  process.env.FIREBASE_WEB_API_KEY ||
+  "";
 
 const CERTS_URL =
   "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
@@ -42,9 +52,50 @@ export function _resetCertsCacheForTests() {
  * `certsFetcher` is injectable so tests can supply a mock cert set without
  * network access.
  */
+async function verifyWithFirebaseLookup(idToken) {
+  if (!FIREBASE_API_KEY) {
+    throw new Error("Firebase API key not configured");
+  }
+
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Firebase lookup failed (${res.status}): ${body}`);
+  }
+
+  const payload = await res.json();
+  const user = payload.users?.[0];
+  if (!user) {
+    throw new Error("Firebase lookup returned no user");
+  }
+
+  return {
+    uid: user.localId || user.uid,
+    email: user.email || null,
+    emailVerified: !!user.emailVerified,
+    name: user.displayName || null,
+  };
+}
+
 export async function verifyFirebaseIdToken(idToken, { certsFetcher } = {}) {
   if (!idToken || typeof idToken !== "string") {
     throw new Error("No ID token provided");
+  }
+
+  if (FIREBASE_API_KEY) {
+    try {
+      return await verifyWithFirebaseLookup(idToken);
+    } catch (lookupErr) {
+      console.warn("[AUTH] Firebase lookup failed, falling back to JWT verification:", lookupErr.message);
+    }
   }
 
   const decoded = jwt.decode(idToken, { complete: true });

@@ -38,9 +38,10 @@ export function useAuth() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to sync session");
         setAppUser(data.user);
+        setAuthError(null);
       } catch (err) {
         console.error("[useAuth] session error:", err);
-        setAuthError(err.message);
+        setAuthError(err.message || "Unable to sign you in right now.");
       } finally {
         setLoading(false);
       }
@@ -76,19 +77,28 @@ export function useAuth() {
   const signUp = useCallback(async ({ name, phone, email, password }) => {
     setAuthError(null);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Set display name in Firebase profile
-      if (auth.currentUser && name) {
-        await updateProfile(auth.currentUser, { displayName: name });
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      if (cred.user && name) {
+        await updateProfile(cred.user, { displayName: name });
       }
 
-      // Notify backend to persist phone (and display name) to local users table.
-      const token = await auth.currentUser.getIdToken();
-      await fetch(`${API_URL}/api/auth/profile`, {
+      const token = await cred.user.getIdToken();
+      const profileRes = await fetch(`${API_URL}/api/auth/profile`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ displayName: name, phone }),
       });
+      const profileData = await profileRes.json().catch(() => ({}));
+      if (!profileRes.ok) throw new Error(profileData.error || "Unable to finish account setup.");
+
+      const sessionRes = await fetch(`${API_URL}/api/auth/session`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sessionData = await sessionRes.json().catch(() => ({}));
+      if (!sessionRes.ok) throw new Error(sessionData.error || "Unable to finish sign-in.");
+      setAppUser(sessionData.user);
+      setAuthError(null);
     } catch (err) {
       setAuthError(friendlyFirebaseError(err));
       throw err;
@@ -98,7 +108,16 @@ export function useAuth() {
   const signIn = useCallback(async (email, password) => {
     setAuthError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const token = await cred.user.getIdToken();
+      const res = await fetch(`${API_URL}/api/auth/session`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Unable to finish sign-in.");
+      setAppUser(data.user);
+      setAuthError(null);
     } catch (err) {
       setAuthError(friendlyFirebaseError(err));
       throw err;
