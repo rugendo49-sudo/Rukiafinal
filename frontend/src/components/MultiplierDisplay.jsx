@@ -4,9 +4,13 @@ import { buildSmoothPath } from "../utils/smoothPath.js";
 
 const WIDTH = 640;
 const HEIGHT = 360;
-const PAD_X = 30;
-const PAD_Y = 34;
+const PAD_X = 6;
+const PAD_Y = 6;
 const PLANE_SIZE = 40;
+// The plane badge needs more breathing room than the curve itself so it
+// never gets clipped by the card edge; the curve/fill still draw all the
+// way into the corner using the tighter PAD_X/PAD_Y above.
+const PLANE_INSET = PLANE_SIZE / 2 + 6;
 
 // Spinning ray backdrop behind the curve, generated once as plain SVG lines
 // (no copied art) — same visual idea as a classic crash-game "explosion"
@@ -61,6 +65,11 @@ function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
   const crashed = phase === "crashed";
   const strokeColor = crashed ? "#fb7185" : "#ef4444";
 
+  // Keep the plane badge fully on-canvas even when the curve tip itself is
+  // sitting right in the corner or hugging an edge.
+  const planeX = Math.min(Math.max(tip.x, PLANE_INSET), WIDTH - PLANE_INSET);
+  const planeY = Math.min(Math.max(tip.y, PLANE_INSET), HEIGHT - PLANE_INSET);
+
   return (
     <svg
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -91,7 +100,7 @@ function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
       {phase !== "waiting" && (
         <g
           className={`curve-plane ${crashed ? "crashed" : ""}`}
-          transform={`translate(${tip.x - PLANE_SIZE / 2}, ${tip.y - PLANE_SIZE / 2})`}
+          transform={`translate(${planeX - PLANE_SIZE / 2}, ${planeY - PLANE_SIZE / 2})`}
         >
           <PlaneIcon rotation={planeRotation} size={PLANE_SIZE} crashed={crashed} />
         </g>

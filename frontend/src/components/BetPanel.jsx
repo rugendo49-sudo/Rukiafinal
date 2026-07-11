@@ -68,32 +68,55 @@ function SlotPanel({ slotNum, phase, slotState, config, placeBet, cashOut, multi
         </button>
       </div>
 
-      <div className="stake-stepper">
-        <button className="stepper-btn" onClick={() => updateAmount(Number(amount) - 10)} disabled={!canInteract}>
-          –
-        </button>
-        <input
-          className="stake-input"
-          type="number"
-          aria-label={`Stake amount for slot ${slotNum}`}
-          min={minAmt}
-          max={maxAmt}
-          step="1"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          disabled={phase !== "waiting" || !!bet}
-        />
-        <button className="stepper-btn" onClick={() => updateAmount(Number(amount) + 10)} disabled={!canInteract}>
-          +
-        </button>
-      </div>
+      <div className="bet-slot-body">
+        <div className="bet-controls-left">
+          <div className="stake-stepper">
+            <button className="stepper-btn" onClick={() => updateAmount(Number(amount) - 10)} disabled={!canInteract}>
+              –
+            </button>
+            <input
+              className="stake-input"
+              type="number"
+              aria-label={`Stake amount for slot ${slotNum}`}
+              min={minAmt}
+              max={maxAmt}
+              step="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={phase !== "waiting" || !!bet}
+            />
+            <button className="stepper-btn" onClick={() => updateAmount(Number(amount) + 10)} disabled={!canInteract}>
+              +
+            </button>
+          </div>
 
-      <div className="quick-presets">
-        {[100, 250, 1000, 25000].map((preset) => (
-          <button key={preset} className="quick-preset" onClick={() => applyPreset(preset)} disabled={!canInteract}>
-            {preset.toFixed(2)} KES
+          <div className="quick-presets">
+            {[100, 200, 500, 3000].map((preset) => (
+              <button key={preset} className="quick-preset" onClick={() => applyPreset(preset)} disabled={!canInteract}>
+                {preset.toLocaleString()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!bet && (
+          <button className="primary-action bet" onClick={handleBet} disabled={phase !== "waiting"}>
+            <span className="primary-action-label">Bet</span>
+            <span className="primary-action-amount">{Number(parseFloat(amount || 0)).toFixed(2)} KES</span>
           </button>
-        ))}
+        )}
+        {canCashOut && (
+          (() => {
+            const stakeKes = bet ? bet.amount / 100 : 0;
+            const potential = stakeKes * multiplier;
+            return (
+              <button className="primary-action cashout" onClick={handleCashOut}>
+                <span className="primary-action-label">Cash Out</span>
+                <span className="primary-action-amount">{potential.toFixed(2)} KES</span>
+              </button>
+            );
+          })()
+        )}
       </div>
 
       {mode === "auto" && (
@@ -114,22 +137,6 @@ function SlotPanel({ slotNum, phase, slotState, config, placeBet, cashOut, multi
 
       {bet?.autoCashoutAt && <div className="auto-cashout-active">Auto: {(bet.autoCashoutAt / 100).toFixed(2)}x</div>}
 
-      {!bet && (
-        <button className="primary-action bet" onClick={handleBet} disabled={phase !== "waiting"}>
-          Bet KES {Number(parseFloat(amount || 0)).toFixed(2)}
-        </button>
-      )}
-      {canCashOut && (
-        (() => {
-          const stakeKes = bet ? bet.amount / 100 : 0;
-          const potential = stakeKes * multiplier;
-          return (
-            <button className="primary-action cashout" onClick={handleCashOut}>
-              Cash Out KES {potential.toFixed(2)}
-            </button>
-          );
-        })()
-      )}
       {bet && phase === "waiting" && <span className="bet-pending">Placed for this round</span>}
 
       {cashoutResult && (

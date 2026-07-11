@@ -57,8 +57,20 @@ input:focus, textarea:focus {
 .app-shell {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px clamp(16px, 2.8vw, 32px) 36px;
+  padding: 0 clamp(12px, 2.4vw, 28px) 36px;
   min-height: 100vh;
+  position: relative;
+}
+
+.app-shell::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  display: block;
+  margin: 0 calc(-1 * clamp(12px, 2.4vw, 28px));
+  height: 4px;
+  background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);
+  z-index: 50;
 }
 
 .hero { position: relative; }
@@ -149,8 +161,13 @@ input:focus, textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
-  padding: 6px 0 14px;
+  margin: 0 0 8px;
+  padding: 10px 0;
+  position: sticky;
+  top: 4px;
+  z-index: 40;
+  background: rgba(6, 8, 20, 0.85);
+  backdrop-filter: blur(10px);
 }
 .brand-mark {
   font-family: var(--font-display);
@@ -439,14 +456,14 @@ input:focus, textarea:focus {
 
 .play-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  gap: 14px;
   align-items: start;
 }
 .play-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .all-bets-panel,
@@ -1035,7 +1052,7 @@ input:focus, textarea:focus {
 .tab-nav {
   display: flex;
   gap: 8px;
-  margin-bottom: 18px;
+  margin: 0 0 10px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
@@ -1421,19 +1438,19 @@ input:focus, textarea:focus {
 }
 
 .bet-panel {
-  border-radius: 24px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 10px;
 }
 .balance-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #94a3b8;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .balance-pill {
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: rgba(255,255,255,0.04);
   color: #f8fafc;
@@ -1441,36 +1458,30 @@ input:focus, textarea:focus {
 .bet-slots-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 .bet-slot {
+  position: relative;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 18px;
-  padding: 14px;
+  border-radius: 14px;
+  padding: 10px;
 }
 .bet-slot-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.bet-slot-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: #f8fafc;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.bet-slot-state {
-  font-size: 11px;
-  color: #64748b;
+  /* Kept in the DOM for state info, visually minimized to match the
+     cleaner reference layout which has no per-slot label row. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 .bet-mode-toggle {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .bet-mode-toggle button {
   border: 1px solid rgba(255,255,255,0.08);
@@ -1487,22 +1498,33 @@ input:focus, textarea:focus {
   color: #7ee787;
   border-color: rgba(126, 231, 135, 0.35);
 }
+.bet-slot-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 8px;
+  align-items: stretch;
+}
+.bet-controls-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
 .stake-stepper {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px;
-  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 6px;
   align-items: center;
-  margin-bottom: 10px;
 }
 .stepper-btn {
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255,255,255,0.08);
   color: #f8fafc;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   cursor: pointer;
 }
 .stepper-btn:disabled,
@@ -1515,22 +1537,23 @@ input:focus, textarea:focus {
   border: 1px solid rgba(255,255,255,0.08);
   background: #06080d;
   color: #f8fafc;
-  border-radius: 12px;
-  padding: 9px 10px;
+  border-radius: 10px;
+  padding: 7px 8px;
   text-align: center;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
+  width: 100%;
+  min-width: 0;
 }
 .quick-presets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
 }
 .quick-preset {
-  padding: 8px 0;
+  padding: 7px 0;
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.03);
   color: #f8fafc;
   font-size: 12px;
@@ -1571,23 +1594,49 @@ input:focus, textarea:focus {
   transform: translateY(-1px);
   filter: brightness(1.04);
 }
-.primary-action {
-  border: none;
-  margin-top: 10px;
-}
 .secondary-action {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: #cbd5e1;
   text-align: left;
 }
+
+/* Bet / Cash Out button inside a bet-slot: sits adjacent to the squeezed
+   stepper+presets column and stretches to match its full height, with the
+   amount on its own line beneath the action label. */
+.bet-slot-body .primary-action {
+  border: none;
+  margin: 0;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 14px;
+}
+.primary-action-label {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+.primary-action-amount {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.92;
+  line-height: 1;
+}
 .primary-action.bet {
-  background: linear-gradient(135deg, #16a34a, #4ade80);
-  color: #031509;
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  color: #eafff0;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.35);
 }
 .primary-action.cashout {
-  background: linear-gradient(135deg, #f97316, #fb7185);
+  background: linear-gradient(180deg, #f97316, #ea580c);
   color: white;
+  box-shadow: 0 8px 18px rgba(234, 88, 12, 0.35);
 }
 .bet-pending {
   display: inline-block;
@@ -2081,6 +2130,15 @@ input:focus, textarea:focus {
   .bet-slots-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+  .bet-slot-body {
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+  .primary-action-label {
+    font-size: 13px;
+  }
+  .primary-action-amount {
+    font-size: 10px;
   }
 
   /* Floating chat toggle button (top-left) */
