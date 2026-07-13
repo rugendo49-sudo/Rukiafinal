@@ -4,13 +4,9 @@ import { buildSmoothPath } from "../utils/smoothPath.js";
 
 const WIDTH = 640;
 const HEIGHT = 360;
-const PAD_X = 6;
-const PAD_Y = 6;
+const PAD_X = 30;
+const PAD_Y = 34;
 const PLANE_SIZE = 40;
-// The plane badge needs more breathing room than the curve itself so it
-// never gets clipped by the card edge; the curve/fill still draw all the
-// way into the corner using the tighter PAD_X/PAD_Y above.
-const PLANE_INSET = PLANE_SIZE / 2 + 6;
 
 // Spinning ray backdrop behind the curve, generated once as plain SVG lines
 // (no copied art) — same visual idea as a classic crash-game "explosion"
@@ -32,15 +28,58 @@ function BurstShell() {
 // ({t, multiplier} samples collected by useGameSocket during "flying"),
 // a gradient fill under it, and an original PlaneIcon riding the tip,
 // oriented along the curve's current tangent.
+//
+// The vertical axis is LOGARITHMIC, not linear. On a linear axis, once a
+// round reaches a high multiplier (e.g. 400x) the axis ceiling has to grow
+// to fit it, which squashes the entire early climb (1x -> 20x) into a
+// sliver of pixels near the bottom — the start of the curve becomes
+// invisible and the plane looks like it "flies off" long before the real
+// crash value. On a log axis, 1x->2x takes the same vertical space as
+// 20x->40x or 200x->400x, so the origin and the early climb always stay
+// visible no matter how high the round eventually goes (1000x, 2000x...).
+const BASE_MAX_T = 7000;
+const BASE_MAX_M = 3; // initial ceiling shown before any zoom-out is needed
+const HEADROOM_T = 1.2;
+const LOG_HEADROOM = 0.55; // constant *visual* margin above the tip, in log-space
+const EASE_RATE = 2.4;
+
 function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
   const points = curvePoints && curvePoints.length > 0 ? curvePoints : [{ t: 0, multiplier: 1 }];
-  const maxT = Math.max(1000, points[points.length - 1]?.t ?? 1000);
   const currentM = phase === "crashed" && lastCrash ? lastCrash.crashPoint / 100 : multiplier;
-  const maxM = Math.max(2, currentM, ...points.map((p) => p.multiplier));
 
+  const scaleRef = useRef({ maxT: BASE_MAX_T, logMaxM: Math.log(BASE_MAX_M), lastTs: null });
+
+  // A fresh round (one point, t=0) snaps the "camera" back to the base
+  // window instantly rather than easing down from the previous round's
+  // zoomed-out scale.
+  if (points.length <= 1) {
+    scaleRef.current = { maxT: BASE_MAX_T, logMaxM: Math.log(BASE_MAX_M), lastTs: null };
+  }
+
+  const rawMaxT = Math.max(1, points[points.length - 1]?.t ?? 0);
+  const rawMaxM = Math.max(1.01, currentM, ...points.map((p) => p.multiplier));
+  const rawLogMaxM = Math.log(rawMaxM);
+
+  const targetMaxT = Math.max(BASE_MAX_T, rawMaxT * HEADROOM_T);
+  const targetLogMaxM = Math.max(Math.log(BASE_MAX_M), rawLogMaxM + LOG_HEADROOM);
+
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const prevScale = scaleRef.current;
+  const dt = prevScale.lastTs ? Math.min(0.12, (now - prevScale.lastTs) / 1000) : 0;
+  const ease = 1 - Math.exp(-EASE_RATE * dt);
+
+  // Ease toward the target window, but never lag behind the actual data
+  // (that would clip the line off the top/right of the canvas).
+  const maxT = Math.max(rawMaxT, prevScale.maxT + (targetMaxT - prevScale.maxT) * ease);
+  const logMaxM = Math.max(rawLogMaxM, prevScale.logMaxM + (targetLogMaxM - prevScale.logMaxM) * ease);
+  scaleRef.current = { maxT, logMaxM, lastTs: now };
+
+  // log(1) = 0, so a point at multiplier 1 always lands exactly on the
+  // baseline — the origin is always visible, at every scale.
   const toXY = (p) => {
     const x = PAD_X + (p.t / maxT) * (WIDTH - PAD_X * 2);
-    const y = HEIGHT - PAD_Y - ((p.multiplier - 1) / (maxM - 1 || 1)) * (HEIGHT - PAD_Y * 2);
+    const logM = Math.log(Math.max(1, p.multiplier));
+    const y = HEIGHT - PAD_Y - (logM / (logMaxM || 1)) * (HEIGHT - PAD_Y * 2);
     return { x, y };
   };
 
@@ -65,11 +104,6 @@ function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
   const crashed = phase === "crashed";
   const strokeColor = crashed ? "#fb7185" : "#ef4444";
 
-  // Keep the plane badge fully on-canvas even when the curve tip itself is
-  // sitting right in the corner or hugging an edge.
-  const planeX = Math.min(Math.max(tip.x, PLANE_INSET), WIDTH - PLANE_INSET);
-  const planeY = Math.min(Math.max(tip.y, PLANE_INSET), HEIGHT - PLANE_INSET);
-
   return (
     <svg
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -92,6 +126,10 @@ function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
 
       <line x1={PAD_X} y1={baseline} x2={WIDTH - PAD_X} y2={baseline} className="curve-baseline" />
 
+      {/* Origin marker: always shown, so users can always see exactly where
+          the curve starts (multiplier = 1, elapsed time = 0). */}
+      <circle cx={PAD_X} cy={baseline} r="5" className="curve-origin-dot" />
+
       {phase !== "waiting" && fillPath && <path d={fillPath} fill="url(#curveFillGradient)" className="curve-fill" />}
       {phase !== "waiting" && linePath && (
         <path d={linePath} fill="none" stroke={strokeColor} className="curve-line" />
@@ -100,7 +138,7 @@ function FlightGraph({ phase, curvePoints, multiplier, lastCrash }) {
       {phase !== "waiting" && (
         <g
           className={`curve-plane ${crashed ? "crashed" : ""}`}
-          transform={`translate(${planeX - PLANE_SIZE / 2}, ${planeY - PLANE_SIZE / 2})`}
+          transform={`translate(${tip.x - PLANE_SIZE / 2}, ${tip.y - PLANE_SIZE / 2})`}
         >
           <PlaneIcon rotation={planeRotation} size={PLANE_SIZE} crashed={crashed} />
         </g>

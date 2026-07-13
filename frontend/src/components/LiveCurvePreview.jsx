@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGameSocket } from "../hooks/useGameSocket.js";
 
 const WIDTH = 420;
 const HEIGHT = 240;
 const PAD_X = 24;
 const PAD_Y = 28;
+const BASE_MAX_M = 3;
+const LOG_HEADROOM = 0.55;
+const EASE_RATE = 2.4;
 
 // A live, unauthenticated read of whatever round is actually in progress on
 // the server right now. This is the hero's signature: real gameplay data,
@@ -12,16 +15,32 @@ const PAD_Y = 28;
 export default function LiveCurvePreview() {
   const { phase, multiplier, lastCrash } = useGameSocket(null, null);
   const [trail, setTrail] = useState([]);
+  const scaleRef = useRef({ logMaxM: Math.log(BASE_MAX_M), lastTs: null });
 
   useEffect(() => {
-    if (phase === "waiting") setTrail([]);
-    else if (phase === "flying") setTrail((t) => [...t, multiplier].slice(-160));
+    if (phase === "waiting") {
+      setTrail([]);
+      scaleRef.current = { logMaxM: Math.log(BASE_MAX_M), lastTs: null };
+    } else if (phase === "flying") setTrail((t) => [...t, multiplier].slice(-160));
   }, [multiplier, phase]);
 
-  const maxM = Math.max(2, multiplier, ...trail);
+  // Eased logarithmic vertical scale — same fix as the main game graph:
+  // a linear scale would squash the 1x->20x climb flat once a round gets
+  // high, making the start of the curve invisible. Log scale keeps every
+  // stage of the climb visible no matter how high it goes.
+  const rawMaxM = Math.max(1.01, multiplier, ...trail);
+  const targetLogMaxM = Math.max(Math.log(BASE_MAX_M), Math.log(rawMaxM) + LOG_HEADROOM);
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const prevScale = scaleRef.current;
+  const dt = prevScale.lastTs ? Math.min(0.12, (now - prevScale.lastTs) / 1000) : 0;
+  const ease = 1 - Math.exp(-EASE_RATE * dt);
+  const logMaxM = Math.max(Math.log(rawMaxM), prevScale.logMaxM + (targetLogMaxM - prevScale.logMaxM) * ease);
+  scaleRef.current = { logMaxM, lastTs: now };
+
   const toPoint = (m, i, len) => {
     const x = len <= 1 ? PAD_X : PAD_X + (i / (len - 1)) * (WIDTH - PAD_X * 2);
-    const y = HEIGHT - PAD_Y - ((m - 1) / (maxM - 1 || 1)) * (HEIGHT - PAD_Y * 2);
+    const logM = Math.log(Math.max(1, m));
+    const y = HEIGHT - PAD_Y - (logM / (logMaxM || 1)) * (HEIGHT - PAD_Y * 2);
     return [x, y];
   };
 
