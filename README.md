@@ -216,3 +216,5 @@ sign-up/login test against real Firebase servers. What I did verify:
   and one real login in your own environment before trusting this further,
   and make sure Email/Password sign-in is enabled in the Firebase Console
   (it's off by default on a new project).
+#   R U K I A - A P P  
+ 
