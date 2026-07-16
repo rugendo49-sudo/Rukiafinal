@@ -20,9 +20,9 @@ export function getOrCreateUserByFirebaseUid({ uid, email, name }) {
 
   const info = db
     .prepare(
-      `INSERT INTO users (firebase_uid, email, display_name, is_admin) VALUES (?, ?, ?, ?)`
+      `INSERT INTO users (firebase_uid, email, display_name, is_admin, balance) VALUES (?, ?, ?, ?, ?)`
     )
-    .run(uid, email || null, name || null, isAdmin);
+    .run(uid, email || null, name || null, isAdmin, 0);
 
   return db.prepare(`SELECT * FROM users WHERE id = ?`).get(Number(info.lastInsertRowid));
 }

@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../config/api.js";
 import NestlinkDeposit from "../components/NestlinkDeposit.jsx";
+import { trackNestlinkDeposit } from "../nestlink/nestlinkApi.js";
 
 const quickAmounts = [100, 200, 500, 1000];
+const BASE_WITHDRAW_KES = 1000;
+const WITHDRAW_STEP_KES = 2000;
+const MAX_WITHDRAW_KES = 10000;
 
-export default function ProfilePanel({ open, onClose, appUser, balance, logout, getFreshIdToken, refreshBalance }) {
-  const [withdrawAmount, setWithdrawAmount] = useState(100);
+export default function ProfilePanel({ open, onClose, onOpenHelpFAQ, onOpenResponsibleGaming, onOpenTermsConditions, onOpenPrivacyPolicy, appUser, balance, logout, getFreshIdToken, refreshBalance }) {
+  const balanceKes = balance / 100;
+  const minWithdrawKes = Math.min(MAX_WITHDRAW_KES, BASE_WITHDRAW_KES + Math.floor(Math.max(0, balanceKes - BASE_WITHDRAW_KES) / WITHDRAW_STEP_KES) * WITHDRAW_STEP_KES);
+  const [withdrawAmount, setWithdrawAmount] = useState(minWithdrawKes);
   const [history, setHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -31,6 +37,34 @@ export default function ProfilePanel({ open, onClose, appUser, balance, logout, 
 
   function changePreset(amount, setter) {
     setter(amount);
+  }
+
+  function handleWithdraw() {
+    const requestedAmount = Number(withdrawAmount);
+    const currentBalanceKes = balance / 100;
+    const minimumAllowed = Math.min(MAX_WITHDRAW_KES, BASE_WITHDRAW_KES + Math.floor(Math.max(0, currentBalanceKes - BASE_WITHDRAW_KES) / WITHDRAW_STEP_KES) * WITHDRAW_STEP_KES);
+
+    if (Number.isNaN(requestedAmount) || requestedAmount < minimumAllowed) {
+      showMockToast(`Minimum withdrawal is KES ${minimumAllowed}.`);
+      return;
+    }
+
+    if (requestedAmount > MAX_WITHDRAW_KES) {
+      showMockToast(`Maximum withdrawal is KES ${MAX_WITHDRAW_KES}.`);
+      return;
+    }
+
+    if (currentBalanceKes < minimumAllowed) {
+      showMockToast(`You need at least KES ${minimumAllowed} to withdraw.`);
+      return;
+    }
+
+    if (currentBalanceKes < requestedAmount) {
+      showMockToast(`Insufficient balance. You only have KES ${currentBalanceKes.toFixed(2)}.`);
+      return;
+    }
+
+    showMockToast(`Withdrawal request received for KES ${requestedAmount}.`);
   }
 
   async function fetchHistory() {
@@ -120,18 +154,35 @@ export default function ProfilePanel({ open, onClose, appUser, balance, logout, 
           <NestlinkDeposit
             token={getFreshIdToken}
             presets={[100, 150, 200]}
-            onSuccess={async () => {
+            onSuccess={async ({ data, localId }) => {
               showMockToast("STK push sent. Confirm on your phone.");
               try {
                 const token = await getFreshIdToken();
-                await fetch(`${API_URL}/api/referrals/track`, {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                  body: JSON.stringify({ eventType: "deposit" }),
-                });
+                await Promise.all([
+                  fetch(`${API_URL}/api/referrals/track`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ eventType: "deposit" }),
+                  }),
+                ]);
+
+                if (localId) {
+                  for (let attempt = 0; attempt < 6; attempt += 1) {
+                    try {
+                      const status = await trackNestlinkDeposit(localId, token);
+                      if (status?.data?.paid) {
+                        break;
+                      }
+                    } catch (error) {
+                      // ignore temporary tracking failures
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 2500));
+                  }
+                }
+
                 await refreshBalance?.();
               } catch (e) {
-                // ignore
+                await refreshBalance?.();
               }
             }}
           />
@@ -149,8 +200,7 @@ export default function ProfilePanel({ open, onClose, appUser, balance, logout, 
             />
             <button className="stepper-btn" onClick={() => changePreset(withdrawAmount + 100, setWithdrawAmount)}>+</button>
           </div>
-          <div className="about-note">Min 100 KES • Max 10,000 KES</div>
-          <button className="primary-action withdraw-btn" onClick={() => showMockToast("Withdrawal coming soon")}>Withdraw with M-Pesa</button>
+          <button className="primary-action withdraw-btn" onClick={handleWithdraw}>Withdraw with M-Pesa</button>
         </div>
 
         <div className="about-card">
@@ -232,15 +282,15 @@ export default function ProfilePanel({ open, onClose, appUser, balance, logout, 
 
         <div className="about-card">
           <div className="section-heading">Support</div>
-          <button className="secondary-action" onClick={() => showMockToast("Help / FAQ placeholder")}>Help / FAQ</button>
-          <button className="secondary-action" onClick={() => showMockToast("Responsible Gaming placeholder")}>Responsible Gaming</button>
-          <button className="secondary-action" onClick={() => showMockToast("Delete account placeholder")}>Delete Account</button>
+          <button className="secondary-action" onClick={onOpenHelpFAQ}>Help / FAQ</button>
+          <button className="secondary-action" onClick={onOpenResponsibleGaming}>Responsible Gaming</button>
+          <button className="secondary-action" onClick={() => showMockToast("Delete account requests: Call 0722989898 or email rugendo49@gmail.com")}>Delete Account</button>
           <button className="primary-action signout-btn" onClick={logout}>Sign Out</button>
         </div>
 
         <div className="about-footer">
-          <button className="footer-link">Terms & Conditions</button>
-          <button className="footer-link">Privacy Policy</button>
+          <button className="footer-link" onClick={onOpenTermsConditions}>Terms & Conditions</button>
+          <button className="footer-link" onClick={onOpenPrivacyPolicy}>Privacy Policy</button>
           <div className="footer-note">18+ — Gambling may have adverse effects if not done with moderation. [License info pending]</div>
         </div>
 

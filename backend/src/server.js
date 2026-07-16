@@ -24,7 +24,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN || process.env.ALLOWED_ORIGINS |
 
 const isPreviewOrigin = (origin) => {
   if (!origin) return true;
-  return /(^https?:\/\/.*\.app\.github\.dev$)|(^https?:\/\/.*\.preview\.app\.github\.dev$)|(^https?:\/\/.*\.githubpreview\.dev$)|(^https?:\/\/.*\.vercel\.app$)|(^https?:\/\/.*\.netlify\.app$)/.test(origin);
+  return /(^https?:\/\/.*\.app\.github\.dev$)|(^https?:\/\/.*\.preview\.app\.github\.dev$)|(^https?:\/\/.*\.githubpreview\.dev$)|(^https?:\/\/.*\.vercel\.app$)/.test(origin);
 };
 
 const isPrivateNetworkOrigin = (origin) => {
@@ -57,6 +57,17 @@ app.use("/api/referrals", referralsRoutes);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
+// Lightweight online users endpoint for quick monitoring
+app.get("/api/online", (_req, res) => {
+  try {
+    const count = typeof io.getOnlineUsersCount === "function" ? io.getOnlineUsersCount() : io.of("/").sockets.size || 0;
+    const list = typeof io.getOnlineUsersList === "function" ? io.getOnlineUsersList() : [];
+    res.json({ ok: true, online: Number(count), users: list });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || String(err) });
+  }
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -65,6 +76,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
+app.locals.io = io;
 
 const roundManager = new RoundManager(io);
 attachGameSocket(io, roundManager);

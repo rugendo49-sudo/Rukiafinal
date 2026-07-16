@@ -1,22 +1,61 @@
 import { verifySocketAuth } from "../routes/middleware.js";
 import { db, GAME_CONFIG } from "../db/index.js";
 
+const maskToken = (t) => {
+  if (!t) return "";
+  if (t === "demo") return "demo";
+  try {
+    return t.length > 10 ? `${t.slice(0, 6)}...${t.slice(-4)}` : t;
+  } catch {
+    return "<tok>";
+  }
+};
+
 export function attachGameSocket(io, roundManager) {
   // track online users per socket.id -> { userId, display_name }
   const onlineUsers = new Map();
+  // expose a helper on the io instance so external routes can report online counts
+  try {
+    io.getOnlineUsersCount = () => onlineUsers.size;
+    io.getOnlineUsersList = () => Array.from(onlineUsers.values());
+  } catch (e) {
+    // ignore if io is readonly for some reason
+  }
+  // Enhanced handshake/auth middleware with logging for diagnostics
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
+    const origin = socket.handshake.headers?.origin || "<no-origin>";
+    const addr = socket.handshake.address || "<no-addr>";
+    console.log(`[socket] handshake from ${addr} origin=${origin} tokenProvided=${!!token}`);
+
     if (!token) return next(); // allow anonymous viewers (read-only)
-    const identity = await verifySocketAuth(token);
-    if (identity) {
+
+    try {
+      const identity = await verifySocketAuth(token);
+      if (!identity) {
+        console.warn(`[socket] auth failed token=${maskToken(token)} peer=${addr} origin=${origin}`);
+        // Reject the handshake with a connection error so clients receive `connect_error`
+        return next(new Error("auth_failed"));
+      }
       socket.userId = identity.userId;
       socket.isAdmin = identity.isAdmin;
+      return next();
+    } catch (err) {
+      console.error(`[socket] verifySocketAuth error token=${maskToken(token)} peer=${addr}`, err?.message || err);
+      return next(err || new Error("auth_error"));
     }
-    next();
+  });
+
+  // Log connection-level handshake errors
+  io.on("connection_error", (err) => {
+    console.warn("[socket] connection_error:", err && err.message ? err.message : err);
   });
 
   io.on("connection", (socket) => {
     // register online user (if authenticated)
+    const addr = socket.handshake.address || "<no-addr>";
+    const origin = socket.handshake.headers?.origin || "<no-origin>";
+    console.log(`[socket] connected id=${socket.id} peer=${addr} origin=${origin} user=${socket.userId ?? 'anon'}`);
     if (socket.userId) {
       try {
         const u = db.prepare(`SELECT id, display_name FROM users WHERE id = ?`).get(socket.userId);
@@ -120,7 +159,8 @@ export function attachGameSocket(io, roundManager) {
       }
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
+      console.log(`[socket] disconnect id=${socket.id} reason=${reason}`);
       if (onlineUsers.has(socket.id)) {
         onlineUsers.delete(socket.id);
         io.emit("chat:users", Array.from(onlineUsers.values()));

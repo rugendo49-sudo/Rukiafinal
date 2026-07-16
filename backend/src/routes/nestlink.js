@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "./middleware.js";
 import { createNestlinkPrompt, trackNestlinkTransaction, getNestlinkPaymentStatus } from "../nestlink/nestlinkService.js";
 import { db } from "../db/index.js";
+import { recordWalletTransaction } from "../db/walletTransactions.js";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ function normalizePhone(phone) {
 
 router.post("/deposit", requireAuth, async (req, res) => {
   try {
-    const { amount, phone, localId } = req.body || {};
+    const { amount, phone } = req.body || {};
     const amountValue = Number(amount);
     const normalizedPhone = normalizePhone(phone);
 
@@ -28,7 +29,7 @@ router.post("/deposit", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Phone number is required" });
     }
 
-    const uniqueLocalId = localId || `nestlink_${req.userId}_${Date.now()}`;
+    const uniqueLocalId = `nestlink_${req.userId}_${Date.now()}`;
     const result = await createNestlinkPrompt({
       phone: normalizedPhone,
       amount: Math.round(amountValue),
@@ -71,13 +72,23 @@ router.get("/status", requireAuth, async (req, res) => {
 
 router.post("/callback", async (req, res) => {
   const payload = req.body || {};
-  const userId = payload?.local_id?.split("_")?.[1];
+  const localId = String(payload?.local_id || "");
+  const userIdMatch = localId.match(/^nestlink_(\d+)_/);
+  const userId = userIdMatch?.[1] ? Number(userIdMatch[1]) : null;
 
   if (payload?.paid && userId) {
     const amountCents = Math.round(Number(payload?.result?.amount || 0) * 100);
     if (amountCents > 0) {
-      db.prepare(`UPDATE users SET balance = balance + ? WHERE id = ?`).run(amountCents, Number(userId));
+      recordWalletTransaction({ userId, kind: "deposit", amountCents, meta: { source: "nestlink_callback" } });
+      const balanceRow = db.prepare(`SELECT balance FROM users WHERE id = ?`).get(userId);
+      const newBalance = balanceRow?.balance ?? null;
+      const io = req.app?.locals?.io;
+      if (io && newBalance !== null) {
+        io.emit("wallet:update", { userId, balance: newBalance, kind: "deposit", amount: amountCents });
+      }
     }
+  } else if (payload?.paid) {
+    console.warn("NestLink callback received paid event without valid local_id user mapping", { localId });
   }
 
   res.status(200).json({ ok: true });

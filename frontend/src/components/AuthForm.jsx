@@ -2,7 +2,7 @@ import { useState } from "react";
 
 export default function AuthForm({ signUp, signIn, authError }) {
   const [mode, setMode] = useState("login");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -13,9 +13,9 @@ export default function AuthForm({ signUp, signIn, authError }) {
     setLoading(true);
     try {
       if (mode === "login") {
-        await signIn(email, password);
+        await signIn(identifier, password);
       } else {
-        await signUp({ name, phone, email, password });
+        await signUp({ name, phone, identifier, password });
       }
     } catch {
       // authError is already set by useAuth; nothing else to do here.
@@ -54,12 +54,12 @@ export default function AuthForm({ signUp, signIn, authError }) {
         )}
 
         <input
-          aria-label="Email"
-          type="email"
-          autoComplete="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          aria-label="Email or phone number"
+          type="text"
+          autoComplete={mode === "login" ? "username" : "email"}
+          placeholder={mode === "login" ? "Email or phone number" : "Email or phone number"}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
         />
         <input

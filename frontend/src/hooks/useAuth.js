@@ -9,6 +9,18 @@ import {
 import { auth } from "../firebase.js";
 import { API_URL } from "../config/api.js";
 
+function normalizeAuthIdentifier(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("@")) return trimmed;
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  const looksLikePhone = digitsOnly.length >= 10 && digitsOnly.length <= 15;
+  if (!looksLikePhone) return trimmed;
+
+  return `phone_${digitsOnly}@rukia.local`;
+}
+
 export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [appUser, setAppUser] = useState(null); // { id, username, email, balance, isAdmin }
@@ -74,10 +86,11 @@ export function useAuth() {
     }
   }, [getFreshIdToken]);
 
-  const signUp = useCallback(async ({ name, phone, email, password }) => {
+  const signUp = useCallback(async ({ name, phone, identifier, password }) => {
     setAuthError(null);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const authIdentifier = normalizeAuthIdentifier(identifier);
+      const cred = await createUserWithEmailAndPassword(auth, authIdentifier, password);
       if (cred.user && name) {
         await updateProfile(cred.user, { displayName: name });
       }
@@ -105,10 +118,11 @@ export function useAuth() {
     }
   }, []);
 
-  const signIn = useCallback(async (email, password) => {
+  const signIn = useCallback(async (identifier, password) => {
     setAuthError(null);
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const authIdentifier = normalizeAuthIdentifier(identifier);
+      const cred = await signInWithEmailAndPassword(auth, authIdentifier, password);
       const token = await cred.user.getIdToken();
       const res = await fetch(`${API_URL}/api/auth/session`, {
         method: "POST",
@@ -156,9 +170,9 @@ export function useAuth() {
 
 function friendlyFirebaseError(err) {
   const code = err?.code || "";
-  if (code.includes("email-already-in-use")) return "That email is already registered — try logging in.";
-  if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Incorrect email or password.";
-  if (code.includes("user-not-found")) return "No account found with that email.";
+  if (code.includes("email-already-in-use")) return "That email or phone login is already registered — try logging in.";
+  if (code.includes("invalid-credential") || code.includes("wrong-password")) return "Incorrect email/phone or password.";
+  if (code.includes("user-not-found")) return "No account found with that email or phone number.";
   if (code.includes("weak-password")) return "Password should be at least 6 characters.";
   if (code.includes("invalid-email")) return "That doesn't look like a valid email address.";
   return err?.message || "Something went wrong. Please try again.";

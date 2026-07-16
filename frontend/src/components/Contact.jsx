@@ -40,33 +40,57 @@ export default function Contact() {
 
       <div className="contact-content">
         <section className="contact-section">
-          <h3>Direct Contact</h3>
-          <p>
-            Email: <a href="mailto:rukia@gmail.com" className="link">rukia@gmail.com</a>
-          </p>
-          <p>Response time: Within 24 hours</p>
+          <h3>Help / FAQ</h3>
+          <p><strong>Need help? We&apos;ve got you covered.</strong></p>
+          <p>Browse answers to common questions about your account, deposits, withdrawals, and more. If you cannot find what you need, reach out to our support team directly.</p>
+          <ul>
+            <li><strong>Phone:</strong> 0722989898</li>
+            <li><strong>Email:</strong> <a href="mailto:rugendo49@gmail.com" className="link">rugendo49@gmail.com</a></li>
+          </ul>
+          <p><strong>Sample FAQ topics:</strong></p>
+          <ul>
+            <li>How do I create an account?</li>
+            <li>How do I deposit or withdraw funds?</li>
+            <li>Why hasn&apos;t my withdrawal been processed?</li>
+            <li>How do I reset my password?</li>
+            <li>How do I verify my account?</li>
+            <li>Who do I contact for further support?</li>
+          </ul>
+          <p><em>For &quot;Who do I contact&quot; — call us on 0722989898 or email rugendo49@gmail.com and our support team will respond promptly.</em></p>
         </section>
 
         <section className="contact-section">
-          <h3>Frequently Asked Questions</h3>
-          <div className="faq-item">
-            <h4>How do I verify a round's fairness?</h4>
-            <p>
-              Each round displays a seed hash when betting opens. After the round crashes, the server seed is revealed, allowing you to verify the hash and confirm the crash point matches the predetermined value.
-            </p>
-          </div>
-          <div className="faq-item">
-            <h4>What's the maximum multiplier?</h4>
-            <p>The multiplier can theoretically reach 20,000x, but crashes occur at random intervals determined by our provably fair algorithm.</p>
-          </div>
-          <div className="faq-item">
-            <h4>Can I deposit and withdraw at any time?</h4>
-            <p>Yes. Deposits and withdrawals are processed instantly through the Wallet page. You can only withdraw up to your current balance.</p>
-          </div>
-          <div className="faq-item">
-            <h4>Is there a minimum bet?</h4>
-            <p>Yes, the minimum bet is typically KES 10. Check the betting interface for current minimums and maximums.</p>
-          </div>
+          <h3>Responsible Gaming</h3>
+          <p><strong>Play responsibly. We&apos;re here to help.</strong></p>
+          <p>We are committed to promoting responsible gaming and ensuring a safe experience for all our users. If you feel your gaming habits are becoming a concern, we encourage you to act early.</p>
+          <p><strong>Tools available to you:</strong></p>
+          <ul>
+            <li>Set deposit limits</li>
+            <li>Set time-out or cool-off periods</li>
+            <li>Self-exclude from the platform temporarily or permanently</li>
+          </ul>
+          <p><strong>Signs to watch for:</strong></p>
+          <ul>
+            <li>Spending more money or time than you intended</li>
+            <li>Gaming to escape stress or personal problems</li>
+            <li>Borrowing money to gamble</li>
+          </ul>
+          <p>If you or someone you know needs support, contact us confidentially:</p>
+          <ul>
+            <li><strong>Phone:</strong> 0722989898</li>
+            <li><strong>Email:</strong> <a href="mailto:rugendo49@gmail.com" className="link">rugendo49@gmail.com</a></li>
+          </ul>
+        </section>
+
+        <section className="contact-section">
+          <h3>Delete Account</h3>
+          <p><strong>Want to delete your account?</strong></p>
+          <p>Account deletion is permanent and cannot be undone. Any remaining balance should be withdrawn before deletion. All personal data will be handled according to our Privacy Policy.</p>
+          <p>To request account deletion, please contact us using one of the methods below and our team will guide you through the process and verify your identity:</p>
+          <ul>
+            <li><strong>Phone:</strong> 0722989898</li>
+            <li><strong>Email:</strong> <a href="mailto:rugendo49@gmail.com" className="link">rugendo49@gmail.com</a></li>
+          </ul>
         </section>
 
         <section className="contact-section">

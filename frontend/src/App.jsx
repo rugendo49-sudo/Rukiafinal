@@ -9,13 +9,17 @@ import History from "./components/History.jsx";
 import AdminDashboard from "./components/AdminDashboard.jsx";
 import ProfilePanel from "./components/ProfilePanel.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
+import HelpFAQ from "./components/HelpFAQ.jsx";
+import ResponsibleGaming from "./components/ResponsibleGaming.jsx";
+import TermsConditions from "./components/TermsConditions.jsx";
+import PrivacyPolicy from "./components/PrivacyPolicy.jsx";
 import { useGameSocket } from "./hooks/useGameSocket.js";
 import { useAuth } from "./hooks/useAuth.js";
 import { API_URL } from "./config/api.js";
 
 export default function App() {
   const { appUser, loading, authError, signUp, signIn, logout, getFreshIdToken, refreshBalance } = useAuth();
-  const [tab, setTab] = useState("play"); // play | leaderboard | stats | admin | wallet | about | contact
+  const [tab, setTab] = useState("play"); // play | leaderboard | stats | admin | wallet | about | contact | help
 
   const [demoMode, setDemoMode] = useState(false);
   const [demoBalance, setDemoBalance] = useState(() => {
@@ -92,6 +96,43 @@ export default function App() {
     setTimeout(() => document.querySelector(".about-intro")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
   }, [appUser, demoMode]);
 
+  const openHelpFAQ = useCallback(() => {
+    setTab("help");
+  }, []);
+
+  const openResponsibleGaming = useCallback(() => {
+    setTab("responsible");
+  }, []);
+
+  const openTermsConditions = useCallback(() => {
+    setTab("terms");
+  }, []);
+
+  const openPrivacyPolicy = useCallback(() => {
+    setTab("privacy");
+  }, []);
+
+  const openAboutSection = useCallback((section) => {
+    if (demoMode || appUser) {
+      setAboutOpen(true);
+      setRoute(`#/${section}`);
+      window.location.hash = `#/${section}`;
+      setTimeout(() => {
+        if (section === "deposit") {
+          const depositInput = document.querySelector('.about-card .wallet-input[type="number"]');
+          if (depositInput) depositInput.focus();
+        }
+        if (section === "withdraw") {
+          const withdrawInput = document.querySelector('.about-card .stepper-row input[type="number"]');
+          if (withdrawInput) withdrawInput.focus();
+        }
+      }, 180);
+      return;
+    }
+
+    showAbout();
+  }, [appUser, demoMode, showAbout]);
+
   useEffect(() => {
     const onHash = () => setRoute(window.location.hash || "");
     window.addEventListener("hashchange", onHash);
@@ -103,13 +144,24 @@ export default function App() {
     if (route === "#/deposit") {
       if (demoMode || appUser) {
         setAboutOpen(true);
-        // focus deposit input after opening
         setTimeout(() => {
-          const input = document.querySelector('.about-card input[type="number"]');
+          const input = document.querySelector('.about-card .wallet-input[type="number"]');
           if (input) input.focus();
         }, 150);
       } else {
-        // not signed in: show landing auth
+        window.location.hash = "";
+        setTimeout(() => document.querySelector('.auth-top-right')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+      }
+    }
+
+    if (route === "#/withdraw") {
+      if (demoMode || appUser) {
+        setAboutOpen(true);
+        setTimeout(() => {
+          const input = document.querySelector('.about-card .stepper-row input[type="number"]');
+          if (input) input.focus();
+        }, 150);
+      } else {
         window.location.hash = "";
         setTimeout(() => document.querySelector('.auth-top-right')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
       }
@@ -183,6 +235,12 @@ export default function App() {
             {connected ? "Live" : "Connecting"}
           </span>
           <span className="topbar-balance">KES {(balance / 100).toFixed(2)}</span>
+          <button className="topbar-pill" onClick={() => openAboutSection("deposit")}>
+            Deposit
+          </button>
+          <button className="topbar-pill" onClick={() => openAboutSection("withdraw")}>
+            Withdraw
+          </button>
           <button className="topbar-pill" onClick={showAbout}>
             About
           </button>
@@ -220,6 +278,8 @@ export default function App() {
             <>
               <div className="mobile-username">{appUser?.username}</div>
               <button className="link-btn" onClick={logout}>Log out</button>
+              <button className="topbar-pill" onClick={() => openAboutSection("deposit")}>Deposit</button>
+              <button className="topbar-pill" onClick={() => openAboutSection("withdraw")}>Withdraw</button>
               <button className="topbar-pill" onClick={showAbout}>About</button>
             </>
           )}
@@ -283,10 +343,18 @@ export default function App() {
       )}
 
       {tab === "admin" && appUser?.isAdmin && <AdminDashboard getToken={getFreshIdToken} />}
+      {tab === "help" && <HelpFAQ />}
+      {tab === "responsible" && <ResponsibleGaming />}
+      {tab === "terms" && <TermsConditions />}
+      {tab === "privacy" && <PrivacyPolicy />}
 
       <ProfilePanel
         open={aboutOpen}
         onClose={() => setAboutOpen(false)}
+        onOpenHelpFAQ={openHelpFAQ}
+        onOpenResponsibleGaming={openResponsibleGaming}
+        onOpenTermsConditions={openTermsConditions}
+        onOpenPrivacyPolicy={openPrivacyPolicy}
         appUser={appUser}
         balance={balance}
         logout={logout}

@@ -15,7 +15,7 @@ router.get("/config", (_req, res) => {
 
 router.get("/balance", requireAuth, (req, res) => {
   const user = db.prepare(`SELECT balance FROM users WHERE id = ?`).get(req.userId);
-  res.json({ balance: user.balance });
+  res.json({ balance: user?.balance ?? 0 });
 });
 
 router.get("/history", requireAuth, (req, res) => {
@@ -28,7 +28,17 @@ router.get("/history", requireAuth, (req, res) => {
        ORDER BY b.id DESC LIMIT 50`
     )
     .all(req.userId);
-  res.json({ bets });
+
+  const walletTransactions = db
+    .prepare(
+      `SELECT id, kind, amount_cents, meta, created_at
+       FROM wallet_transactions
+       WHERE user_id = ?
+       ORDER BY id DESC`
+    )
+    .all(req.userId);
+
+  res.json({ bets, walletTransactions });
 });
 
 router.get("/rounds/recent", (_req, res) => {

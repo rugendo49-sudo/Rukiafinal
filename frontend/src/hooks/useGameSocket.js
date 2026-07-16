@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
-import { SERVER_URL } from "../config/api.js";
+import { API_URL, SERVER_URL } from "../config/api.js";
 
 const emptySlot = () => ({ bet: null, cashoutResult: null });
+const GAME_STATE_KEY = "rukia-game-state";
 
 const toMultiplierDecimal = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric / 100 : 1;
+};
+
+const loadPersistedGameState = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = window.localStorage.getItem(GAME_STATE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch (e) {
+    return {};
+  }
 };
 
 // `getToken` is an async function returning a fresh Firebase ID token (or
@@ -15,23 +26,65 @@ const toMultiplierDecimal = (value) => {
 // expired while the tab was idle gets renewed automatically on reconnect.
 export function useGameSocket(getToken, userId, demoMode = false, demoBalance = 0, setDemoBalance = () => {}, onBalanceRefresh = () => {}) {
   const socketRef = useRef(null);
-  const flyStartRef = useRef(null);
-  const curvePointsRef = useRef([]);
-  const [phase, setPhase] = useState("connecting"); // waiting | flying | crashed
-  const [multiplier, setMultiplier] = useState(1.0);
-  const [finalCrashMultiplier, setFinalCrashMultiplier] = useState(null);
-  const [seedHash, setSeedHash] = useState(null);
-  const [lastCrash, setLastCrash] = useState(null); // { crashPoint, serverSeed, ... }
-  const [history, setHistory] = useState([]);
+  const persistedGameState = loadPersistedGameState();
+  const flyStartRef = useRef(persistedGameState.flightStartTime ?? null);
+  const curvePointsRef = useRef(persistedGameState.curvePoints ?? []);
+  const [phase, setPhase] = useState(persistedGameState.phase || "connecting"); // waiting | flying | crashed
+  const [multiplier, setMultiplier] = useState(persistedGameState.multiplier ?? 1.0);
+  const [finalCrashMultiplier, setFinalCrashMultiplier] = useState(persistedGameState.finalCrashMultiplier ?? null);
+  const [seedHash, setSeedHash] = useState(persistedGameState.seedHash ?? null);
+  const [lastCrash, setLastCrash] = useState(persistedGameState.lastCrash ?? null); // { crashPoint, serverSeed, ... }
+  const [history, setHistory] = useState(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = window.localStorage.getItem("rukia-round-history");
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.slice(0, 20) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [config, setConfig] = useState({ minBetCents: 1000, maxBetCents: 5000000, maxBetsPerRound: 2 });
+  const [waitMs, setWaitMs] = useState(persistedGameState.waitMs ?? null);
+  const [waitStart, setWaitStart] = useState(persistedGameState.waitStart ?? null);
+  const [curvePoints, setCurvePoints] = useState(persistedGameState.curvePoints ?? []);
+  const [flightStartTime, setFlightStartTime] = useState(persistedGameState.flightStartTime ?? null);
+
+  useEffect(() => {
+    curvePointsRef.current = curvePoints;
+  }, [curvePoints]);
+
+  useEffect(() => {
+    if (flightStartTime !== null) {
+      flyStartRef.current = flightStartTime;
+    }
+  }, [flightStartTime]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("rukia-round-history", JSON.stringify(history));
+      const state = {
+        phase,
+        multiplier,
+        finalCrashMultiplier,
+        seedHash,
+        lastCrash,
+        waitMs,
+        waitStart,
+        curvePoints,
+        flightStartTime,
+      };
+      window.localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
+    } catch (e) {
+      // ignore storage failures
+    }
+  }, [history, phase, multiplier, finalCrashMultiplier, seedHash, lastCrash, waitMs, waitStart, curvePoints, flightStartTime]);
+
   const [allBets, setAllBets] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [countdownSeconds, setCountdownSeconds] = useState(null); // countdown timer during waiting phase
-  const [waitMs, setWaitMs] = useState(null);
-  const [waitStart, setWaitStart] = useState(null);
-  const [curvePoints, setCurvePoints] = useState([]);
-  const [flightStartTime, setFlightStartTime] = useState(null);
   const [connected, setConnected] = useState(false);
   const [watchdogStatus, setWatchdogStatus] = useState(null);
   const lastTickRef = useRef(Date.now());
@@ -50,16 +103,62 @@ export function useGameSocket(getToken, userId, demoMode = false, demoBalance = 
 
       socket = io(SERVER_URL, {
         auth: token ? { token } : {},
+        transports: ["websocket", "polling"],
       });
       socketRef.current = socket;
 
-      socket.on("round:state", (data) => {
-        setPhase(data.state);
+      const setRoundState = (state, data) => {
+        setPhase(state);
         setSeedHash(data.seedHash);
         if (data.config) setConfig((c) => ({ ...c, ...data.config }));
-        if (data.multiplier !== undefined) {
-          setMultiplier(toMultiplierDecimal(data.multiplier));
+
+        if (state === "waiting") {
+          setMultiplier(1.0);
+          setFinalCrashMultiplier(null);
+          setAllBets([]);
+          curvePointsRef.current = [];
+          setCurvePoints([]);
+          flyStartRef.current = null;
+          setWaitMs(data.waitMs ?? 10000);
+          setWaitStart(Date.now());
+          setFlightStartTime(null);
+          autoCashoutHandledRef.current.clear();
+          setSlots({ 1: emptySlot(), 2: emptySlot() });
+          setCountdownSeconds(Math.ceil((data.waitMs ?? 10000) / 1000));
         }
+
+        if (state === "flying") {
+          if (data?.multiplier !== undefined) {
+            const current = toMultiplierDecimal(data.multiplier);
+            setMultiplier(current);
+            if (!flyStartRef.current) {
+              const elapsedMs = Math.log(current) / 0.00012;
+              const startedAt = Date.now() - elapsedMs;
+              flyStartRef.current = startedAt;
+              setFlightStartTime(startedAt);
+            }
+          }
+        }
+
+        if (state === "crashed") {
+          const crashMultiplier = toMultiplierDecimal(data.crashPoint ?? data.multiplier);
+          setFinalCrashMultiplier(crashMultiplier);
+          setMultiplier(crashMultiplier);
+          setLastCrash(data);
+        }
+      };
+
+      socket.on("round:state", (data) => {
+        setRoundState(data.state, data);
+      });
+
+      socket.on("round:crashed", (data) => {
+        const crashMultiplier = toMultiplierDecimal(data.crashPoint);
+        setPhase("crashed");
+        setFinalCrashMultiplier(crashMultiplier);
+        setMultiplier(crashMultiplier);
+        setLastCrash(data);
+        setHistory((h) => [{ crashPoint: data.crashPoint, roundId: data.roundId }, ...h].slice(0, 20));
       });
 
       socket.on("round:waiting", (data) => {
@@ -180,7 +279,13 @@ export function useGameSocket(getToken, userId, demoMode = false, demoBalance = 
         setFinalCrashMultiplier(crashMultiplier);
         setMultiplier(crashMultiplier);
         setLastCrash(data);
-        setHistory((h) => [{ crashPoint: data.crashPoint, roundId: data.roundId }, ...h].slice(0, 20));
+        setHistory((h) => {
+          const next = [{ crashPoint: data.crashPoint, roundId: data.roundId }, ...h]
+            .filter((item, index, self) => self.findIndex((r) => r.roundId === item.roundId) === index)
+            .slice(0, 20);
+          window.localStorage.setItem("rukia-round-history", JSON.stringify(next));
+          return next;
+        });
 
         if (demoMode) {
           setSlots((prev) => {
@@ -207,9 +312,32 @@ export function useGameSocket(getToken, userId, demoMode = false, demoBalance = 
         }
       });
 
-      socket.on("connect", () => setConnected(true));
+      socket.on("connect", async () => {
+        setConnected(true);
+        try {
+          const res = await fetch(`${API_URL}/api/wallet/rounds/recent`);
+          if (res.ok) {
+            const json = await res.json();
+            const recent = Array.isArray(json.rounds) ? json.rounds : [];
+            if (recent.length > 0) {
+              setHistory((h) => [
+                ...recent.map((round) => ({ crashPoint: round.crash_point, roundId: round.id })),
+                ...h,
+              ]
+                .filter((item, index, self) => self.findIndex((r) => r.roundId === item.roundId) === index)
+                .slice(0, 20)
+              );
+            }
+          }
+        } catch (err) {
+          // ignore fetch failures
+        }
+      });
       socket.on("disconnect", () => setConnected(false));
-      socket.on("connect_error", () => setConnected(false));
+      socket.on("connect_error", (err) => {
+        console.warn("[useGameSocket] connect_error", err);
+        setConnected(false);
+      });
 
       socket.on("chat:message", (msg) => {
         setChatMessages((m) => [msg, ...m].slice(0, 200));

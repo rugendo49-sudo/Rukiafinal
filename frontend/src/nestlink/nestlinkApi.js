@@ -1,13 +1,13 @@
 import { API_URL } from "../config/api.js";
 
-export async function createNestlinkDeposit({ amount, phone, localId, token }) {
+export async function createNestlinkDeposit({ amount, phone, token }) {
   const response = await fetch(`${API_URL}/api/nestlink/deposit`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ amount, phone, localId }),
+    body: JSON.stringify({ amount, phone }),
   });
 
   const data = await response.json().catch(() => ({}));

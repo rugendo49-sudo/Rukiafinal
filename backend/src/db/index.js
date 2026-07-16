@@ -12,9 +12,19 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT,
   display_name TEXT,
   phone TEXT,
-  balance INTEGER NOT NULL DEFAULT 100000, -- stored in cents (1000.00 signup bonus)
+  balance INTEGER NOT NULL DEFAULT 0,
   is_admin INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  meta TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS rounds (

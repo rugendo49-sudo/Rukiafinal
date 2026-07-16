@@ -24,8 +24,7 @@ export default function NestlinkDeposit({ token, onSuccess, presets = [100, 150,
     setMessage("");
 
     try {
-      const localId = `nestlink_${Date.now()}`;
-      const result = await createNestlinkDeposit({ amount: Number(amount), phone: phone.trim(), localId, token: resolvedToken });
+      const result = await createNestlinkDeposit({ amount: Number(amount), phone: phone.trim(), token: resolvedToken });
       setMessageType("success");
       setMessage("STK push sent. Check your phone and confirm the payment.");
       await onSuccess?.(result);
